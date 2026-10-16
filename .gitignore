@@ -1,0 +1,16 @@
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/
+storage/*
+!storage/proyectos/
+!storage/perfiles/
+storage/proyectos/*
+storage/perfiles/*
+!storage/proyectos/.gitkeep
+!storage/perfiles/.gitkeep
