@@ -6,13 +6,24 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.db.session import engine
-
+from app.api.auth import router as auth_router
+from app.api.perfiles import router as perfiles_router
+from app.api.academico import router as academico_router
+from app.api.roles import router as roles_router
+from app.api.administracion import router as administracion_router
+from app.api.proyectos import router as proyectos_router
 
 app = FastAPI(
     title="InvestigaTec API",
     description="Sistema de gestion y revision de proyectos del Cuerpo Academico",
     version="2.0.0"
 )
+app.include_router(auth_router)
+app.include_router(perfiles_router)
+app.include_router(academico_router)
+app.include_router(roles_router)
+app.include_router(administracion_router)
+app.include_router(proyectos_router)
 
 origins = [
     origin.strip()
