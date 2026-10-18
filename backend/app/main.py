@@ -12,6 +12,9 @@ from app.api.academico import router as academico_router
 from app.api.roles import router as roles_router
 from app.api.administracion import router as administracion_router
 from app.api.proyectos import router as proyectos_router
+from app.api.archivos import router as archivos_router
+from app.api.revisiones import router as revisiones_router
+from app.api.notificaciones import router as notificaciones_router
 
 app = FastAPI(
     title="InvestigaTec API",
@@ -24,6 +27,9 @@ app.include_router(academico_router)
 app.include_router(roles_router)
 app.include_router(administracion_router)
 app.include_router(proyectos_router)
+app.include_router(archivos_router)
+app.include_router(revisiones_router)
+app.include_router(notificaciones_router)
 
 origins = [
     origin.strip()
