@@ -46,7 +46,7 @@ class Perfil(Base):
     especialidad: Mapped[str | None] = mapped_column(String(150))
 
     perfil_visible: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
+        Boolean, default=False, nullable=False
     )
 
     fecha_actualizacion: Mapped[datetime] = mapped_column(

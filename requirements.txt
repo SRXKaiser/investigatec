@@ -40,3 +40,4 @@ email-validator
 python-multipart
 pypdf
 python-docx
+Pillow>=11,<13

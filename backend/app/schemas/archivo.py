@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -9,6 +8,7 @@ class ArchivoRespuesta(BaseModel):
 
     id_archivo: int
     id_proyecto: int
+    id_documento: int
     nombre_original: str
     tipo_mime: str
     version: int

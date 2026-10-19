@@ -81,7 +81,7 @@ def registrar_usuario(
             f"{nuevo_usuario.nombre} "
             f"{nuevo_usuario.apellido_paterno}"
         ),
-        perfil_visible=True,
+        perfil_visible=False,
     )
 
     db.add(nuevo_perfil)

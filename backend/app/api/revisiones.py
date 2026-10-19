@@ -18,8 +18,9 @@ from app.models.proyecto import Proyecto
 from app.models.archivo import Archivo
 from app.models.revision import Revision
 from app.models.decision import Decision
-from app.models.historial import HistorialEstado
+from app.services.estados import actualizar_estado_proyecto
 from app.models.notificacion import Notificacion
+from app.models.asignacion_revisor import AsignacionRevisor
 
 from app.schemas.revision import (
     RevisionAsignar,
@@ -36,35 +37,7 @@ router = APIRouter(
 )
 
 
-def cambiar_estado(
-    db: Session,
-    proyecto: Proyecto,
-    estado_nuevo: str,
-    id_usuario: int,
-):
-    anterior = proyecto.estado
-
-    if anterior == estado_nuevo:
-        return
-
-    proyecto.estado = estado_nuevo
-
-    db.add(
-        HistorialEstado(
-            id_proyecto=proyecto.id_proyecto,
-            estado_anterior=anterior,
-            estado_nuevo=estado_nuevo,
-            id_usuario=id_usuario,
-        )
-    )
-
-
-def notificar(
-    db: Session,
-    id_usuario: int,
-    titulo: str,
-    mensaje: str,
-):
+def notificar(db, id_usuario, titulo, mensaje):
     db.add(
         Notificacion(
             id_usuario=id_usuario,
@@ -73,6 +46,171 @@ def notificar(
             leida=False,
         )
     )
+
+
+def validar_documento_para_revision(db, archivo):
+    """
+    Permite revisar solamente la ultima version
+    de un documento que no haya sido enviada antes.
+    """
+
+    ultima = db.scalar(
+        select(Archivo)
+        .where(
+            Archivo.id_proyecto == archivo.id_proyecto,
+            Archivo.nombre_original == archivo.nombre_original,
+        )
+        .order_by(
+            Archivo.version.desc(),
+            Archivo.id_archivo.desc(),
+        )
+        .limit(1)
+    )
+
+    if ultima is None or ultima.id_archivo != archivo.id_archivo:
+        raise HTTPException(
+            status_code=409,
+            detail="Debes enviar la version mas reciente",
+        )
+
+    revision_previa = db.scalar(
+        select(Revision.id_revision)
+        .where(Revision.id_archivo == archivo.id_archivo)
+        .limit(1)
+    )
+
+    if revision_previa is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta version ya fue enviada a revision",
+        )
+
+    # No se permite crear otra version pendiente
+    # del mismo documento.
+    pendiente = db.scalar(
+        select(Revision.id_revision)
+        .join(Archivo, Revision.id_archivo == Archivo.id_archivo)
+        .where(
+            Archivo.id_proyecto == archivo.id_proyecto,
+            Archivo.nombre_original == archivo.nombre_original,
+            Revision.estado == "PENDIENTE",
+        )
+        .limit(1)
+    )
+
+    if pendiente is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Este documento ya tiene una revision pendiente",
+        )
+
+
+def crear_revision(db, archivo, proyecto, id_revisor, id_usuario):
+    revision = Revision(
+        id_archivo=archivo.id_archivo,
+        id_revisor=id_revisor,
+        estado="PENDIENTE",
+    )
+
+    db.add(revision)
+    db.flush()
+
+    actualizar_estado_proyecto(
+        db,
+        proyecto,
+        id_usuario,
+    )
+
+    notificar(
+        db,
+        id_revisor,
+        "Documento pendiente de revision",
+        (
+            f"El documento {archivo.nombre_original} "
+            f"(version {archivo.version}) del proyecto "
+            f"{proyecto.titulo} requiere tu revision."
+        ),
+    )
+
+    db.commit()
+    db.refresh(revision)
+
+    return revision
+
+
+@router.post(
+    "/enviar/{id_archivo}",
+    response_model=RevisionRespuesta,
+    status_code=201,
+)
+def enviar_a_revision(
+    id_archivo: int,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    try:
+        archivo = db.get(Archivo, id_archivo)
+
+        if archivo is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Documento no encontrado",
+            )
+
+        proyecto = db.scalar(
+            select(Proyecto)
+            .where(Proyecto.id_proyecto == archivo.id_proyecto)
+            .with_for_update()
+        )
+
+        if proyecto is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Proyecto no encontrado",
+            )
+
+        if proyecto.id_usuario != usuario.id_usuario:
+            raise HTTPException(
+                status_code=403,
+                detail="Solo el investigador propietario puede enviar",
+            )
+
+        validar_documento_para_revision(db, archivo)
+
+        asignacion = db.get(
+            AsignacionRevisor,
+            usuario.id_usuario,
+        )
+
+        if asignacion is None:
+            raise HTTPException(
+                status_code=409,
+                detail="No tienes un revisor asignado",
+            )
+
+        revisor = db.get(Usuario, asignacion.id_revisor)
+
+        if (
+            revisor is None
+            or not revisor.activo
+            or not tiene_rol(db, revisor.id_usuario, "REVISOR")
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="El revisor asignado no esta disponible",
+            )
+
+        return crear_revision(
+            db,
+            archivo,
+            proyecto,
+            revisor.id_usuario,
+            usuario.id_usuario,
+        )
+
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post(
@@ -85,6 +223,11 @@ def asignar_revision(
     admin: Usuario = Depends(requerir_admin),
     db: Session = Depends(get_db),
 ):
+    """
+    Asignacion manual administrativa.
+    Se conserva por compatibilidad.
+    """
+
     try:
         archivo = db.get(Archivo, datos.id_archivo)
 
@@ -100,91 +243,33 @@ def asignar_revision(
             .with_for_update()
         )
 
-        if proyecto.estado not in ("BORRADOR", "CORRECCIONES"):
+        if proyecto is None:
             raise HTTPException(
-                status_code=409,
-                detail="El proyecto no admite una nueva revision",
+                status_code=404,
+                detail="Proyecto no encontrado",
             )
 
         revisor = db.get(Usuario, datos.id_revisor)
 
-        if revisor is None or not revisor.activo:
+        if (
+            revisor is None
+            or not revisor.activo
+            or not tiene_rol(db, revisor.id_usuario, "REVISOR")
+        ):
             raise HTTPException(
-                status_code=404,
-                detail="Revisor no encontrado o inactivo",
+                status_code=422,
+                detail="El usuario seleccionado no es un revisor activo",
             )
 
-        if not tiene_rol(db, revisor.id_usuario, "REVISOR"):
-            raise HTTPException(
-                status_code=403,
-                detail="El usuario no tiene el rol REVISOR",
-            )
+        validar_documento_para_revision(db, archivo)
 
-        ultima_version = db.scalar(
-            select(func.max(Archivo.version)).where(
-                Archivo.id_proyecto == archivo.id_proyecto,
-                Archivo.nombre_original == archivo.nombre_original,
-            )
-        )
-
-        if archivo.version != ultima_version:
-            raise HTTPException(
-                status_code=409,
-                detail="Solo se puede revisar la version mas reciente",
-            )
-
-        revision_anterior = db.scalar(
-            select(Revision.id_revision)
-            .where(Revision.id_archivo == archivo.id_archivo)
-            .limit(1)
-        )
-
-        if revision_anterior is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="Este archivo ya fue enviado a revision",
-            )
-
-        # Una sola revision activa por proyecto.
-        pendiente = db.scalar(
-            select(Revision.id_revision)
-            .join(Archivo, Revision.id_archivo == Archivo.id_archivo)
-            .where(
-                Archivo.id_proyecto == proyecto.id_proyecto,
-                Revision.estado == "PENDIENTE",
-            )
-            .limit(1)
-        )
-
-        if pendiente is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="El proyecto ya tiene una revision pendiente",
-            )
-
-        revision = Revision(
-            id_archivo=archivo.id_archivo,
-            id_revisor=revisor.id_usuario,
-            estado="PENDIENTE",
-        )
-
-        db.add(revision)
-
-        cambiar_estado(
-            db, proyecto, "PENDIENTE", admin.id_usuario
-        )
-
-        notificar(
+        return crear_revision(
             db,
+            archivo,
+            proyecto,
             revisor.id_usuario,
-            "Nueva revision asignada",
-            f"Se te asigno el documento {archivo.nombre_original} "
-            f"del proyecto {proyecto.titulo}.",
+            admin.id_usuario,
         )
-
-        db.commit()
-        db.refresh(revision)
-        return revision
 
     except Exception:
         db.rollback()
@@ -205,7 +290,10 @@ def mis_revisiones_pendientes(
             Revision.id_revisor == revisor.id_usuario,
             Revision.estado == "PENDIENTE",
         )
-        .order_by(Revision.fecha_asignacion)
+        .order_by(
+            Revision.fecha_asignacion,
+            Revision.id_revision,
+        )
     ).all()
 
 
@@ -220,7 +308,10 @@ def mis_revisiones(
     return db.scalars(
         select(Revision)
         .where(Revision.id_revisor == revisor.id_usuario)
-        .order_by(Revision.fecha_asignacion.desc())
+        .order_by(
+            Revision.fecha_asignacion.desc(),
+            Revision.id_revision.desc(),
+        )
     ).all()
 
 
@@ -236,6 +327,26 @@ def registrar_decision(
     db: Session = Depends(get_db),
 ):
     try:
+        # Bloqueamos primero el proyecto para mantener
+        # un orden consistente de bloqueos.
+        id_proyecto = db.scalar(
+            select(Archivo.id_proyecto)
+            .join(Revision, Revision.id_archivo == Archivo.id_archivo)
+            .where(Revision.id_revision == id_revision)
+        )
+
+        if id_proyecto is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Revision no encontrada",
+            )
+
+        proyecto = db.scalar(
+            select(Proyecto)
+            .where(Proyecto.id_proyecto == id_proyecto)
+            .with_for_update()
+        )
+
         revision = db.scalar(
             select(Revision)
             .where(Revision.id_revision == id_revision)
@@ -260,20 +371,6 @@ def registrar_decision(
                 detail="La revision ya fue finalizada",
             )
 
-        archivo = db.get(Archivo, revision.id_archivo)
-
-        proyecto = db.scalar(
-            select(Proyecto)
-            .where(Proyecto.id_proyecto == archivo.id_proyecto)
-            .with_for_update()
-        )
-
-        if proyecto.estado != "PENDIENTE":
-            raise HTTPException(
-                status_code=409,
-                detail="El proyecto no esta pendiente de revision",
-            )
-
         if (
             datos.resultado == "CORRECCIONES"
             and not (datos.comentario or "").strip()
@@ -292,8 +389,10 @@ def registrar_decision(
         if decision_existente is not None:
             raise HTTPException(
                 status_code=409,
-                detail="Esta revision ya tiene una decision",
+                detail="La revision ya tiene una decision",
             )
+
+        archivo = db.get(Archivo, revision.id_archivo)
 
         comentario = (
             datos.comentario.strip()
@@ -307,16 +406,17 @@ def registrar_decision(
             comentario=comentario,
         )
 
+        db.add(decision)
+
         revision.estado = datos.resultado
         revision.observaciones = comentario
         revision.fecha_revision = datetime.now(timezone.utc)
 
-        db.add(decision)
+        db.flush()
 
-        cambiar_estado(
+        actualizar_estado_proyecto(
             db,
             proyecto,
-            datos.resultado,
             revisor.id_usuario,
         )
 
@@ -324,13 +424,16 @@ def registrar_decision(
             db,
             proyecto.id_usuario,
             "Resultado de revision",
-            f"El documento {archivo.nombre_original} "
-            f"recibio el resultado {datos.resultado}. "
-            f"Observaciones: {comentario or 'Sin observaciones'}.",
+            (
+                f"El documento {archivo.nombre_original} "
+                f"recibio el resultado {datos.resultado}. "
+                f"Observaciones: {comentario or 'Sin observaciones'}."
+            ),
         )
 
         db.commit()
         db.refresh(decision)
+
         return decision
 
     except Exception:
@@ -355,10 +458,17 @@ def consultar_historial(
             detail="Proyecto no encontrado",
         )
 
-    es_propietario = proyecto.id_usuario == usuario.id_usuario
-    es_admin = tiene_rol(db, usuario.id_usuario, "ADMIN")
+    es_propietario = (
+        proyecto.id_usuario == usuario.id_usuario
+    )
 
-    es_revisor_asignado = db.scalar(
+    es_admin = tiene_rol(
+        db,
+        usuario.id_usuario,
+        "ADMIN",
+    )
+
+    es_revisor = db.scalar(
         select(Revision.id_revision)
         .join(Archivo, Revision.id_archivo == Archivo.id_archivo)
         .where(
@@ -368,11 +478,7 @@ def consultar_historial(
         .limit(1)
     ) is not None
 
-    if not (
-        es_propietario
-        or es_admin
-        or es_revisor_asignado
-    ):
+    if not (es_propietario or es_admin or es_revisor):
         raise HTTPException(
             status_code=403,
             detail="No tienes acceso al historial",
@@ -381,5 +487,8 @@ def consultar_historial(
     return db.scalars(
         select(HistorialEstado)
         .where(HistorialEstado.id_proyecto == id_proyecto)
-        .order_by(HistorialEstado.fecha_cambio)
+        .order_by(
+            HistorialEstado.fecha_cambio,
+            HistorialEstado.id_historial,
+        )
     ).all()

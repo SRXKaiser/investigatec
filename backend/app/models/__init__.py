@@ -1,3 +1,4 @@
+
 from app.models.usuario import Usuario
 
 from app.models.perfil import (
@@ -17,8 +18,10 @@ from app.models.seguridad import (
 from app.models.auditoria import Auditoria
 
 from app.models.proyecto import Proyecto
+from app.models.documento import Documento
 from app.models.archivo import Archivo
 from app.models.revision import Revision
 from app.models.decision import Decision
 from app.models.historial import HistorialEstado
 from app.models.notificacion import Notificacion
+from app.models.asignacion_revisor import AsignacionRevisor

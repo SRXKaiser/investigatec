@@ -36,8 +36,11 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
+
     volumes:
       - ./storage:/code/storage
+      - ./backend/alembic:/code/alembic
+
     depends_on:
       db:
         condition: service_healthy

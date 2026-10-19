@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.db.session import engine
+
 from app.api.auth import router as auth_router
 from app.api.perfiles import router as perfiles_router
 from app.api.academico import router as academico_router
@@ -15,12 +17,16 @@ from app.api.proyectos import router as proyectos_router
 from app.api.archivos import router as archivos_router
 from app.api.revisiones import router as revisiones_router
 from app.api.notificaciones import router as notificaciones_router
+from app.api.asignaciones import router as asignaciones_router
+from app.api.seguimiento import router as seguimiento_router
+
 
 app = FastAPI(
     title="InvestigaTec API",
     description="Sistema de gestion y revision de proyectos del Cuerpo Academico",
-    version="2.0.0"
+    version="2.0.0",
 )
+
 app.include_router(auth_router)
 app.include_router(perfiles_router)
 app.include_router(academico_router)
@@ -30,6 +36,8 @@ app.include_router(proyectos_router)
 app.include_router(archivos_router)
 app.include_router(revisiones_router)
 app.include_router(notificaciones_router)
+app.include_router(asignaciones_router)
+app.include_router(seguimiento_router)
 
 origins = [
     origin.strip()
@@ -42,7 +50,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 
@@ -50,7 +58,7 @@ app.add_middleware(
 def root():
     return {
         "mensaje": "Bienvenido a InvestigaTec API",
-        "version": "2.0.0"
+        "version": "2.0.0",
     }
 
 
@@ -62,11 +70,11 @@ def health():
 
         return {
             "api": "ok",
-            "database": "connected"
+            "database": "connected",
         }
 
     except SQLAlchemyError:
         return {
             "api": "ok",
-            "database": "disconnected"
+            "database": "disconnected",
         }

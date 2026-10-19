@@ -68,7 +68,7 @@ def consultar_archivo(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(obtener_usuario_actual),
 ):
-    return servicio.obtener_archivo_propio(
+    return servicio.obtener_archivo_para_lectura(
         db, id_archivo, usuario.id_usuario
     )
 
@@ -101,22 +101,27 @@ def subir_nueva_version(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(obtener_usuario_actual),
 ):
-    anterior = servicio.obtener_archivo_propio(
-        db, id_archivo, usuario.id_usuario
-    )
-
-    extension_anterior = anterior.nombre_original.rsplit(".", 1)[-1].lower()
-    extension_nueva = (
-        (archivo.filename or "").rsplit(".", 1)[-1].lower()
-    )
-
-    if extension_anterior != extension_nueva:
-        raise HTTPException(
-            status_code=422,
-            detail="La nueva version debe conservar el formato original",
+    try:
+        anterior = servicio.obtener_archivo_propio(
+            db, id_archivo, usuario.id_usuario
         )
 
-    try:
+        extension_anterior = (
+            anterior.nombre_original.rsplit(".", 1)[-1].lower()
+        )
+        extension_nueva = (
+            (archivo.filename or "").rsplit(".", 1)[-1].lower()
+        )
+
+        if extension_anterior != extension_nueva:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "La nueva version debe conservar "
+                    "el formato original"
+                ),
+            )
+
         return servicio.guardar_archivo(
             db,
             anterior.id_proyecto,

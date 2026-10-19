@@ -1,7 +1,8 @@
+
 from pathlib import Path
 from uuid import uuid4
 from zipfile import ZipFile, BadZipFile
-import os
+import logging
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, func
@@ -9,12 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.models.archivo import Archivo
 from app.models.proyecto import Proyecto
-
-import logging
+from app.models.revision import Revision
 from app.services.detector_resumen import detectar_resumen
+from app.services.estados import actualizar_estado_proyecto
+from app.core.permissions import tiene_rol
+
+
 logger = logging.getLogger(__name__)
+
 CARPETA_STORAGE = Path("/code/storage")
-TAMANO_MAXIMO = 500 * 1024 * 1024  # 500 MB
+TAMANO_MAXIMO = 500 * 1024 * 1024
 
 TIPOS_PERMITIDOS = {
     ".pdf": "application/pdf",
@@ -26,7 +31,9 @@ TIPOS_PERMITIDOS = {
 
 
 def obtener_proyecto_propio(
-    db: Session, id_proyecto: int, id_usuario: int
+    db: Session,
+    id_proyecto: int,
+    id_usuario: int,
 ):
     proyecto = db.scalar(
         select(Proyecto).where(
@@ -38,14 +45,87 @@ def obtener_proyecto_propio(
     if proyecto is None:
         raise HTTPException(
             status_code=404,
-            detail="Proyecto no encontrado",
+            detail="Proyecto propio no encontrado",
         )
 
     return proyecto
 
 
+def obtener_proyecto_para_escritura(
+    db: Session,
+    id_proyecto: int,
+    id_usuario: int,
+):
+    proyecto = db.get(Proyecto, id_proyecto)
+
+    if proyecto is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Proyecto no encontrado",
+        )
+
+    if (
+        proyecto.id_usuario != id_usuario
+        and not tiene_rol(db, id_usuario, "ADMIN")
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permisos para subir documentos",
+        )
+
+    return proyecto
+
+
+def puede_leer_archivo(
+    db: Session,
+    archivo: Archivo,
+    id_usuario: int,
+) -> bool:
+    proyecto = db.get(Proyecto, archivo.id_proyecto)
+
+    if proyecto is None:
+        return False
+
+    if proyecto.id_usuario == id_usuario:
+        return True
+
+    if tiene_rol(db, id_usuario, "ADMIN"):
+        return True
+
+    revision = db.scalar(
+        select(Revision.id_revision)
+        .where(
+            Revision.id_archivo == archivo.id_archivo,
+            Revision.id_revisor == id_usuario,
+        )
+        .limit(1)
+    )
+
+    return revision is not None
+
+
+def obtener_archivo_para_lectura(
+    db: Session,
+    id_archivo: int,
+    id_usuario: int,
+):
+    archivo = db.get(Archivo, id_archivo)
+
+    if archivo is None or not puede_leer_archivo(
+        db, archivo, id_usuario
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Archivo no encontrado o sin acceso",
+        )
+
+    return archivo
+
+
 def obtener_archivo_propio(
-    db: Session, id_archivo: int, id_usuario: int
+    db: Session,
+    id_archivo: int,
+    id_usuario: int,
 ):
     archivo = db.get(Archivo, id_archivo)
 
@@ -55,7 +135,7 @@ def obtener_archivo_propio(
             detail="Archivo no encontrado",
         )
 
-    obtener_proyecto_propio(
+    obtener_proyecto_para_escritura(
         db, archivo.id_proyecto, id_usuario
     )
 
@@ -84,7 +164,10 @@ def validar_contenido(ruta: Path, extension: str):
         )
 
 
-def guardar_contenido(archivo: UploadFile, destino: Path):
+def guardar_contenido(
+    archivo: UploadFile,
+    destino: Path,
+):
     total = 0
 
     with destino.open("wb") as salida:
@@ -111,6 +194,62 @@ def guardar_contenido(archivo: UploadFile, destino: Path):
         )
 
 
+def obtener_ultima_version(
+    db: Session,
+    id_proyecto: int,
+    nombre_documento: str,
+):
+    return db.scalar(
+        select(Archivo)
+        .where(
+            Archivo.id_proyecto == id_proyecto,
+            Archivo.nombre_original == nombre_documento,
+        )
+        .order_by(
+            Archivo.version.desc(),
+            Archivo.id_archivo.desc(),
+        )
+        .limit(1)
+    )
+
+
+def obtener_ultima_revision(
+    db: Session,
+    id_archivo: int,
+):
+    return db.scalar(
+        select(Revision)
+        .where(Revision.id_archivo == id_archivo)
+        .order_by(
+            Revision.fecha_asignacion.desc(),
+            Revision.id_revision.desc(),
+        )
+        .limit(1)
+    )
+
+
+def existe_revision_pendiente(
+    db: Session,
+    id_proyecto: int,
+    nombre_documento: str,
+) -> bool:
+    id_revision = db.scalar(
+        select(Revision.id_revision)
+        .join(
+            Archivo,
+            Archivo.id_archivo == Revision.id_archivo,
+        )
+        .where(
+            Archivo.id_proyecto == id_proyecto,
+            Archivo.nombre_original == nombre_documento,
+            Revision.estado == "PENDIENTE",
+        )
+        .limit(1)
+    )
+
+    return id_revision is not None
+
+
 def guardar_archivo(
     db: Session,
     id_proyecto: int,
@@ -119,66 +258,139 @@ def guardar_archivo(
     nombre_documento: str | None = None,
     nueva_version: bool = False,
 ):
-    proyecto = obtener_proyecto_propio(
-        db, id_proyecto, id_usuario
-    )
-
-    if proyecto.estado not in ("BORRADOR", "CORRECCIONES"):
-        raise HTTPException(
-            status_code=409,
-            detail="El proyecto no permite subir documentos",
-        )
-
-    nombre_recibido = archivo_subido.filename or ""
-
-    # Eliminar posibles rutas enviadas en el nombre
-    nombre_recibido = nombre_recibido.replace("\\", "/").split("/")[-1]
-
-    if not nombre_recibido or len(nombre_recibido) > 255:
-        raise HTTPException(
-            status_code=422,
-            detail="Nombre de archivo invalido",
-        )
-
-    extension = Path(nombre_recibido).suffix.lower()
-
-    if extension not in TIPOS_PERMITIDOS:
-        raise HTTPException(
-            status_code=415,
-            detail="Solo se permiten archivos PDF y DOCX",
-        )
-
-    nombre = nombre_documento or nombre_recibido
-
-    version_actual = db.scalar(
-        select(func.max(Archivo.version)).where(
-            Archivo.id_proyecto == id_proyecto,
-            Archivo.nombre_original == nombre,
-        )
-    )
-
-    if version_actual is not None and not nueva_version:
-        raise HTTPException(
-            status_code=409,
-            detail="El documento ya existe; utiliza el endpoint de versiones",
-        )
-
-    if nueva_version and version_actual is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No existe una version anterior",
-        )
-
-    siguiente_version = (version_actual or 0) + 1
-
-    carpeta = CARPETA_STORAGE / str(id_proyecto)
-    carpeta.mkdir(parents=True, exist_ok=True)
-
-    destino = carpeta / f"{uuid4().hex}{extension}"
+    destino = None
 
     try:
-        guardar_contenido(archivo_subido, destino)
-        validar_contenido(destino, extension)
+        proyecto = db.scalar(
+            select(Proyecto)
+            .where(
+                Proyecto.id_proyecto == id_proyecto
+            )
+            .with_for_update()
+        )
+
+        if proyecto is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Proyecto no encontrado",
+            )
+
+        if (
+            proyecto.id_usuario != id_usuario
+            and not tiene_rol(db, id_usuario, "ADMIN")
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes permisos para subir documentos",
+            )
+
+        nombre_recibido = archivo_subido.filename or ""
+        nombre_recibido = (
+            nombre_recibido.replace("\\", "/").split("/")[-1]
+        )
+
+        if not nombre_recibido or len(nombre_recibido) > 255:
+            raise HTTPException(
+                status_code=422,
+                detail="Nombre de archivo invalido",
+            )
+
+        extension = Path(nombre_recibido).suffix.lower()
+
+        if extension not in TIPOS_PERMITIDOS:
+            raise HTTPException(
+                status_code=415,
+                detail="Solo se permiten archivos PDF y DOCX",
+            )
+
+        nombre = nombre_documento or nombre_recibido
+
+        ultima_version = obtener_ultima_version(
+            db,
+            id_proyecto,
+            nombre,
+        )
+
+        if ultima_version is not None and not nueva_version:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "El documento ya existe; "
+                    "utiliza el endpoint de versiones"
+                ),
+            )
+
+        if nueva_version and ultima_version is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No existe una version anterior",
+            )
+
+        if existe_revision_pendiente(
+            db,
+            id_proyecto,
+            nombre,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "El documento tiene una revision pendiente. "
+                    "Espera la decision del revisor."
+                ),
+            )
+
+        if nueva_version:
+            revision_anterior = obtener_ultima_revision(
+                db,
+                ultima_version.id_archivo,
+            )
+
+            if (
+                revision_anterior is not None
+                and revision_anterior.estado == "APROBADO"
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "El documento ya esta aprobado. "
+                        "No se puede sustituir mediante correcciones."
+                    ),
+                )
+
+            extension_anterior = Path(
+                ultima_version.nombre_original
+            ).suffix.lower()
+
+            if extension != extension_anterior:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "La nueva version debe conservar "
+                        "el formato original"
+                    ),
+                )
+
+        siguiente_version = (
+            ultima_version.version + 1
+            if ultima_version is not None
+            else 1
+        )
+
+        carpeta = CARPETA_STORAGE / str(id_proyecto)
+        carpeta.mkdir(parents=True, exist_ok=True)
+
+        destino = carpeta / f"{uuid4().hex}{extension}"
+
+        guardar_contenido(
+            archivo_subido,
+            destino,
+        )
+
+        validar_contenido(
+            destino,
+            extension,
+        )
+
         resumen = None
 
         try:
@@ -199,6 +411,14 @@ def guardar_archivo(
         )
 
         db.add(nuevo)
+        db.flush()
+
+        actualizar_estado_proyecto(
+            db,
+            proyecto,
+            id_usuario,
+        )
+
         db.commit()
         db.refresh(nuevo)
 
@@ -206,19 +426,68 @@ def guardar_archivo(
 
     except Exception:
         db.rollback()
-        destino.unlink(missing_ok=True)
+
+        if destino is not None:
+            destino.unlink(missing_ok=True)
+
         raise
 
 
 def listar_archivos(
-    db: Session, id_proyecto: int, id_usuario: int
+    db: Session,
+    id_proyecto: int,
+    id_usuario: int,
 ):
-    obtener_proyecto_propio(db, id_proyecto, id_usuario)
+    proyecto = db.get(Proyecto, id_proyecto)
+
+    if proyecto is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Proyecto no encontrado",
+        )
+
+    consulta = select(Archivo).where(
+        Archivo.id_proyecto == id_proyecto
+    )
+
+    if (
+        proyecto.id_usuario != id_usuario
+        and not tiene_rol(db, id_usuario, "ADMIN")
+    ):
+        archivos_asignados = (
+            select(Revision.id_archivo)
+            .where(
+                Revision.id_revisor == id_usuario
+            )
+        )
+
+        consulta = consulta.where(
+            Archivo.id_archivo.in_(
+                archivos_asignados
+            )
+        )
+
+        existe_asignacion = db.scalar(
+            select(Revision.id_revision)
+            .join(
+                Archivo,
+                Archivo.id_archivo == Revision.id_archivo,
+            )
+            .where(
+                Archivo.id_proyecto == id_proyecto,
+                Revision.id_revisor == id_usuario,
+            )
+            .limit(1)
+        )
+
+        if existe_asignacion is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Proyecto no encontrado o sin acceso",
+            )
 
     return db.scalars(
-        select(Archivo)
-        .where(Archivo.id_proyecto == id_proyecto)
-        .order_by(
+        consulta.order_by(
             Archivo.nombre_original,
             Archivo.version.desc(),
         )
@@ -226,13 +495,20 @@ def listar_archivos(
 
 
 def ruta_para_descarga(
-    db: Session, id_archivo: int, id_usuario: int
+    db: Session,
+    id_archivo: int,
+    id_usuario: int,
 ):
-    archivo = obtener_archivo_propio(
-        db, id_archivo, id_usuario
+    archivo = obtener_archivo_para_lectura(
+        db,
+        id_archivo,
+        id_usuario,
     )
 
-    ruta = Path(archivo.ruta_almacenamiento).resolve()
+    ruta = Path(
+        archivo.ruta_almacenamiento
+    ).resolve()
+
     raiz = CARPETA_STORAGE.resolve()
 
     if not ruta.is_relative_to(raiz):
