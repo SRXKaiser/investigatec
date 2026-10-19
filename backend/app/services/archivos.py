@@ -9,6 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.models.archivo import Archivo
+from app.models.documento import Documento
 from app.models.proyecto import Proyecto
 from app.models.revision import Revision
 from app.services.detector_resumen import detectar_resumen
@@ -194,22 +195,51 @@ def guardar_contenido(
         )
 
 
+def obtener_documento(
+    db: Session,
+    id_documento: int,
+    id_proyecto: int | None = None,
+):
+    consulta = select(Documento).where(
+        Documento.id_documento == id_documento
+    )
+
+    if id_proyecto is not None:
+        consulta = consulta.where(
+            Documento.id_proyecto == id_proyecto
+        )
+
+    return db.scalar(consulta)
+
+
 def obtener_ultima_version(
     db: Session,
     id_proyecto: int,
-    nombre_documento: str,
+    nombre_documento: str | None = None,
+    id_documento: int | None = None,
 ):
-    return db.scalar(
-        select(Archivo)
-        .where(
-            Archivo.id_proyecto == id_proyecto,
-            Archivo.nombre_original == nombre_documento,
+    consulta = select(Archivo).where(
+        Archivo.id_proyecto == id_proyecto
+    )
+
+    if id_documento is not None:
+        consulta = consulta.where(
+            Archivo.id_documento == id_documento
         )
-        .order_by(
+    elif nombre_documento is not None:
+        consulta = consulta.where(
+            Archivo.nombre_original == nombre_documento
+        )
+    else:
+        raise ValueError(
+            "Se requiere id_documento o nombre_documento"
+        )
+
+    return db.scalar(
+        consulta.order_by(
             Archivo.version.desc(),
             Archivo.id_archivo.desc(),
-        )
-        .limit(1)
+        ).limit(1)
     )
 
 
@@ -231,9 +261,10 @@ def obtener_ultima_revision(
 def existe_revision_pendiente(
     db: Session,
     id_proyecto: int,
-    nombre_documento: str,
+    nombre_documento: str | None = None,
+    id_documento: int | None = None,
 ) -> bool:
-    id_revision = db.scalar(
+    consulta = (
         select(Revision.id_revision)
         .join(
             Archivo,
@@ -241,13 +272,24 @@ def existe_revision_pendiente(
         )
         .where(
             Archivo.id_proyecto == id_proyecto,
-            Archivo.nombre_original == nombre_documento,
             Revision.estado == "PENDIENTE",
         )
-        .limit(1)
     )
 
-    return id_revision is not None
+    if id_documento is not None:
+        consulta = consulta.where(
+            Archivo.id_documento == id_documento
+        )
+    elif nombre_documento is not None:
+        consulta = consulta.where(
+            Archivo.nombre_original == nombre_documento
+        )
+    else:
+        raise ValueError(
+            "Se requiere id_documento o nombre_documento"
+        )
+
+    return db.scalar(consulta.limit(1)) is not None
 
 
 def guardar_archivo(
@@ -257,6 +299,7 @@ def guardar_archivo(
     archivo_subido: UploadFile,
     nombre_documento: str | None = None,
     nueva_version: bool = False,
+    id_documento: int | None = None,
 ):
     destino = None
 
@@ -305,41 +348,64 @@ def guardar_archivo(
 
         nombre = nombre_documento or nombre_recibido
 
-        ultima_version = obtener_ultima_version(
-            db,
-            id_proyecto,
-            nombre,
-        )
-
-        if ultima_version is not None and not nueva_version:
+        if len(nombre) > 255:
             raise HTTPException(
-                status_code=409,
-                detail=(
-                    "El documento ya existe; "
-                    "utiliza el endpoint de versiones"
-                ),
+                status_code=422,
+                detail="Nombre de documento invalido",
             )
 
-        if nueva_version and ultima_version is None:
-            raise HTTPException(
-                status_code=404,
-                detail="No existe una version anterior",
-            )
-
-        if existe_revision_pendiente(
-            db,
-            id_proyecto,
-            nombre,
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "El documento tiene una revision pendiente. "
-                    "Espera la decision del revisor."
-                ),
-            )
+        documento = None
+        ultima_version = None
 
         if nueva_version:
+            if id_documento is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Se requiere id_documento para "
+                        "crear una nueva version"
+                    ),
+                )
+
+            documento = obtener_documento(
+                db,
+                id_documento,
+                id_proyecto,
+            )
+
+            if documento is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Documento no encontrado",
+                )
+
+            ultima_version = obtener_ultima_version(
+                db,
+                id_proyecto,
+                id_documento=id_documento,
+            )
+
+            if ultima_version is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No existe una version anterior",
+                )
+
+            nombre = ultima_version.nombre_original
+
+            if existe_revision_pendiente(
+                db,
+                id_proyecto,
+                id_documento=id_documento,
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "El documento tiene una revision pendiente. "
+                        "Espera la decision del revisor."
+                    ),
+                )
+
             revision_anterior = obtener_ultima_revision(
                 db,
                 ultima_version.id_archivo,
@@ -369,6 +435,42 @@ def guardar_archivo(
                         "el formato original"
                     ),
                 )
+
+        else:
+            if id_documento is not None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Para utilizar un documento existente "
+                        "debes usar el endpoint de versiones"
+                    ),
+                )
+
+            documento_existente = db.scalar(
+                select(Documento.id_documento)
+                .where(
+                    Documento.id_proyecto == id_proyecto,
+                    Documento.nombre == nombre,
+                )
+                .limit(1)
+            )
+
+            if documento_existente is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "El documento ya existe; "
+                        "utiliza el endpoint de versiones"
+                    ),
+                )
+
+            documento = Documento(
+                id_proyecto=id_proyecto,
+                nombre=nombre,
+            )
+
+            db.add(documento)
+            db.flush()
 
         siguiente_version = (
             ultima_version.version + 1
@@ -403,6 +505,7 @@ def guardar_archivo(
 
         nuevo = Archivo(
             id_proyecto=id_proyecto,
+            id_documento=documento.id_documento,
             nombre_original=nombre,
             ruta_almacenamiento=str(destino),
             tipo_mime=TIPOS_PERMITIDOS[extension],
@@ -488,7 +591,7 @@ def listar_archivos(
 
     return db.scalars(
         consulta.order_by(
-            Archivo.nombre_original,
+            Archivo.id_documento,
             Archivo.version.desc(),
         )
     ).all()

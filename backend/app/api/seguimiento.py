@@ -116,7 +116,7 @@ def construir_seguimiento(
             Archivo.id_proyecto == proyecto.id_proyecto
         )
         .order_by(
-            Archivo.nombre_original,
+            Archivo.id_documento,
             Archivo.version,
             Archivo.id_archivo,
         )
@@ -125,11 +125,12 @@ def construir_seguimiento(
     documentos = {}
 
     for archivo in archivos:
-        nombre = archivo.nombre_original
+        identidad = archivo.id_documento
 
-        if nombre not in documentos:
-            documentos[nombre] = {
-                "nombre_documento": nombre,
+        if identidad not in documentos:
+            documentos[identidad] = {
+                "id_documento": identidad,
+                "nombre_documento": archivo.nombre_original,
                 "estado": "BORRADOR",
                 "version_actual": 0,
                 "id_archivo_actual": None,
@@ -182,6 +183,7 @@ def construir_seguimiento(
 
         version = {
             "id_archivo": archivo.id_archivo,
+            "id_documento": archivo.id_documento,
             "version": archivo.version,
             "nombre_original": archivo.nombre_original,
             "fecha_subida": archivo.fecha_subida,
@@ -190,7 +192,7 @@ def construir_seguimiento(
             "revisiones": historial_revisiones,
         }
 
-        documento = documentos[nombre]
+        documento = documentos[identidad]
         documento["versiones"].append(version)
 
         if (
@@ -206,6 +208,9 @@ def construir_seguimiento(
         ):
             documento["version_actual"] = archivo.version
             documento["id_archivo_actual"] = archivo.id_archivo
+            documento["nombre_documento"] = (
+                archivo.nombre_original
+            )
             documento["estado"] = version["estado"]
 
     lista_documentos = list(documentos.values())

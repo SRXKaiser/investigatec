@@ -129,6 +129,7 @@ def subir_nueva_version(
             archivo,
             nombre_documento=anterior.nombre_original,
             nueva_version=True,
+            id_documento=anterior.id_documento,
         )
     finally:
         archivo.file.close()
