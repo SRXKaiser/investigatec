@@ -109,6 +109,12 @@ def validar_documento_para_revision(db, archivo):
 
 
 def crear_revision(db, archivo, proyecto, id_revisor, id_usuario):
+    if proyecto.id_usuario == id_revisor:
+        raise HTTPException(
+            status_code=403,
+            detail="No puedes revisar documentos de tus propios proyectos",
+        )
+
     revision = Revision(
         id_archivo=archivo.id_archivo,
         id_revisor=id_revisor,
@@ -191,6 +197,12 @@ def enviar_a_revision(
             raise HTTPException(
                 status_code=409,
                 detail="No tienes un revisor asignado",
+            )
+
+        if asignacion.id_revisor == usuario.id_usuario:
+            raise HTTPException(
+                status_code=409,
+                detail="Necesitas un revisor diferente para evaluar tus documentos",
             )
 
         revisor = db.get(
@@ -399,6 +411,12 @@ def registrar_decision(
             raise HTTPException(
                 status_code=404,
                 detail="Revision no encontrada",
+            )
+
+        if proyecto.id_usuario == revisor.id_usuario:
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes emitir decisiones sobre tus propios proyectos",
             )
 
         if revision.id_revisor != revisor.id_usuario:
