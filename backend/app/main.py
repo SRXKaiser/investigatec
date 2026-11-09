@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.session import engine
 
 from app.api.auth import router as auth_router
+from app.api.directorio import router as directorio_router
 from app.api.perfiles import router as perfiles_router
 from app.api.academico import router as academico_router
 from app.api.roles import router as roles_router
@@ -28,6 +29,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(directorio_router)
 app.include_router(perfiles_router)
 app.include_router(academico_router)
 app.include_router(roles_router)

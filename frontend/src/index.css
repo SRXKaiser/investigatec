@@ -1,0 +1,380 @@
+@import "tailwindcss";
+
+@theme {
+  /* FUENTES */
+  --font-pixel: "Pixelify Sans", sans-serif;
+  --font-sub-pixel: "Geist Pixel", sans-serif;
+  --font-cuerpo:  "Montserrat", sans-serif;
+  --animate-swing: swing 3s ease-in-out infinite;
+}
+
+@keyframes swing {
+  0%   { transform: rotate(0deg); }
+  25%  { transform: rotate(5deg); }
+  75%  { transform: rotate(-5deg); }
+  100% { transform: rotate(0deg); }
+}
+
+:root {
+  /* MODO CLARO */
+  --negro: #08060d;
+  --bg: #fdfaf2;
+  --rojo:#c1121f;
+  --rojo-oscuro:#780000;
+  --rosita:#f6c5c5;
+  --cafe:rgb(64, 18, 5);
+  --bg2:rgb(239, 239, 239);
+  --celeste:#669bbc;
+  --azul:rgb(0, 48, 73);
+  --rey:rgb(28, 22, 142);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  font: 18px/145% var(--font-cuerpo);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--texto);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;        /* o 100svh para mÃƒÂ³vil */
+  display: flex;
+  flex-direction: column;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #2e303a;
+    --code-bg: #1f2028;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+    --social-bg: rgba(47, 48, 58, 0.5);
+    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+.full-bleed {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-cuerpo);
+  font-style: var(--text-h);
+}
+
+#root {
+  max-width: 100%;
+  margin: 0 auto;
+  /* padding-left: 50px;
+  padding-right: 50px; */
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.servcios{
+  font-size: 112px;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Contenedor de los 3 servicios Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicios-palette {
+  display: flex;
+  height: 450px;
+  width: 100%;
+  gap: 8px;
+  padding: 20px;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Cada servicio Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicio-card {
+  flex: 1;
+  height: 100%;
+  /* border-radius: 15px; */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.4s ease-out;
+  position: relative;
+}
+
+/* Colores de cada tarjeta */
+.servicio-card { background: var(--rojo); }
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ TÃƒÂ­tulo siempre visible Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicio-titulo {
+  font-family: var(--font-pixel);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+  margin-bottom: 12px;
+  transition: transform 0.3s ease-out;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SubtÃƒÂ­tulo siempre visible Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicio-subtitulo {
+  font-family: var(--font-cuerpo);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: center;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ DescripciÃƒÂ³n oculta al inicio Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicio-descripcion {
+  font-family: var(--font-cuerpo);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
+  margin-top: 16px;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.3s ease-out, max-height 0.4s ease-out;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HOVER: la tarjeta se expande y aparece la descripciÃƒÂ³n Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.servicio-card:hover {
+  flex: 2;
+  box-shadow: rgba(100, 100, 111, 0.3) 0px 7px 29px 0px;
+}
+
+.servicio-card:hover .servicio-titulo {
+  transform: translateY(-10px);
+}
+
+.servicio-card:hover .servicio-descripcion {
+  opacity: 1;
+  max-height: 300px;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Responsive: en mÃƒÂ³vil se apilan verticalmente Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+@media (max-width: 768px) {
+  .servicios-palette {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .servicio-card {
+    min-height: 200px;
+    flex: none;
+  }
+
+  .servicio-card:hover {
+    flex: none;
+  }
+
+  /* En mÃƒÂ³vil, la descripciÃƒÂ³n siempre visible */
+  .servicio-descripcion {
+    opacity: 1;
+    max-height: 300px;
+  }
+}
+
+h1 {
+  font-size: 56px;
+  letter-spacing: -1.68px;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ BotÃƒÂ³n 3D base (aplicable a Link o button) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.btn {
+  --btn-radius: 0.75em;
+  --btn-color: var(--bg);           /* "tapa" clara */
+  --btn-base: var(--rojo-oscuro);/* base oscura */
+  
+  display: inline-block;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--btn-radius);
+  background: var(--btn-base);   /* base */
+  padding: 0;
+  transition: filter 0.2s ease;
+}
+
+.btn .btn-tapa {
+  display: block;
+  box-sizing: border-box;
+  border: 2px solid var(--btn-base);
+  border-radius: var(--btn-radius);
+  padding: 0.3em 1.4em;
+  background: var(--btn-color);
+  color: var(--btn-base);
+  transform: translateY(-0.2em);
+  transition: transform 0.1s ease, background 0.2s ease, color 0.2s ease;
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Hover: la tapa sube Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.btn:hover .btn-tapa {
+  transform: translateY(-0.33em);
+  background-color: var(--rosita);
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Activo: la tapa baja (se presiona) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.btn:active .btn-tapa {
+  transform: translateY(0);
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Variante rojo (para "Iniciar sesiÃƒÂ³n") Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.btn.btn-rojo {
+  --btn-color: var(--rojo);
+  --btn-base: var(--rojo-oscuro);
+}
+
+.btn.btn-rojo .btn-tapa {
+  color: var(--bg);
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Variante transparente (para "RegÃƒÂ­strate" y links del menÃƒÂº) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.btn.btn-base {
+  --btn-color: transparent;
+  --btn-base: transparent;
+  background: transparent;
+  border: 2px solid var(--cafe);
+}
+
+.btn.btn-base .btn-tapa {
+  border: none;
+  padding: 0.5em 0.9em;
+  color: var(--cafe);
+  background: transparent;
+  transform: none;
+}
+
+.btn.btn-base:hover .btn-tapa {
+  color: var(--rojo);
+  transform: none;
+}
+.btn.btn-ng {
+  --btn-color: var(--bg);       /* tapa clara */
+  --btn-base: var(--negro);      /* base azul (en lugar de rojo-oscuro) */
+}
+
+.btn.btn-ng .btn-tapa {
+  color: var(--negro);           /* texto del color de la base */
+  border: 2px solid var(--negro);
+}
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fondo animado de categorÃƒÂ­as Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+.categoria-flotante {
+  animation-name: flotarCategoria;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  will-change: transform, opacity, filter;
+}
+
+@keyframes flotarCategoria {
+  0% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 0.7;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  80% {
+    opacity: 0.7;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.9);
+  }
+}
+
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Modo oscuro para texto claro sobre fondo oscuro Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
+@media (prefers-color-scheme: dark) {
+  .categoria-flotante {
+    color: var(--cafe);
+  }
+}
+
+/* @keyframes caerY Aterrizar {
+  0% {
+    transform: translateY(-120vh) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(10px) rotate(2deg);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-6px) rotate(-1deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+} */
+
+@keyframes aparecerSuave {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-caer {
+  animation: caerYAterrizar 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-aparecer {
+  opacity: 0;
+  animation: aparecerSuave 0.8s ease-out 1.2s forwards;
+}
