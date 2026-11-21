@@ -1,4 +1,5 @@
 
+import os
 from pathlib import Path
 from uuid import uuid4
 from zipfile import ZipFile, BadZipFile
@@ -19,7 +20,7 @@ from app.core.permissions import tiene_rol
 
 logger = logging.getLogger(__name__)
 
-CARPETA_STORAGE = Path("/code/storage")
+CARPETA_STORAGE = Path(os.getenv("STORAGE_PATH", "/code/storage"))
 TAMANO_MAXIMO = 500 * 1024 * 1024
 
 TIPOS_PERMITIDOS = {
@@ -627,3 +628,21 @@ def ruta_para_descarga(
         )
 
     return archivo, ruta
+
+
+def reprocesar_resumen_archivo(db: Session, id_archivo: int, id_usuario: int):
+    """Recalcula la extracción sin cambiar el archivo ni su historial."""
+    archivo = obtener_archivo_propio(db, id_archivo, id_usuario)
+    _, ruta = ruta_para_descarga(db, id_archivo, id_usuario)
+    try:
+        nuevo_resumen = detectar_resumen(ruta)
+    except Exception as exc:
+        logger.exception("Error al reprocesar archivo %s", id_archivo)
+        raise HTTPException(
+            status_code=422,
+            detail="No fue posible analizar el contenido del documento",
+        ) from exc
+    archivo.resumen_detectado = nuevo_resumen
+    db.commit()
+    db.refresh(archivo)
+    return archivo

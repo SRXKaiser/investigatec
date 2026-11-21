@@ -29,10 +29,14 @@ async function cargarUsuario(
     ...new Set(rolesResponse.data.map((role) => role.nombre).filter(isRole)),
   ];
   if (!usuarioResponse.data.activo)
-    throw new ApiRequestError("La cuenta está desactivada. Contacta al administrador.", 403);
+    throw new ApiRequestError(
+      "La cuenta está desactivada. Contacta al administrador.",
+      403,
+    );
   if (!roles.length)
     throw new ApiRequestError(
-      "La cuenta no tiene ningún rol habilitado. Consulta al administrador.", 403,
+      "La cuenta no tiene ningún rol habilitado. Consulta al administrador.",
+      403,
     );
   const tipo_usuario =
     preferido && roles.includes(preferido)
@@ -62,9 +66,7 @@ export const authService = {
       password,
     });
     if (!data.access_token || data.token_type.toLowerCase() !== "bearer") {
-      throw new Error(
-        "No fue posible iniciar sesión. Inténtalo nuevamente.",
-      );
+      throw new Error("No fue posible iniciar sesión. Inténtalo nuevamente.");
     }
     // El token se envía explícitamente, sin persistir una sesión parcial.
     const usuario = await cargarUsuario(data.access_token);

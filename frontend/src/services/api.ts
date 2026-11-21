@@ -19,9 +19,12 @@ export class ApiRequestError extends Error {
 }
 
 // Evita mostrar detalles técnicos, trazas y errores de infraestructura al usuario.
-const MENSAJE_SERVICIO = "No pudimos completar la solicitud. Inténtalo de nuevo.";
-const MENSAJE_CONEXION = "No fue posible establecer conexión. Comprueba tu conexión e inténtalo nuevamente.";
-const TECNICO = /fastapi|backend|cors|traceback|exception|sqlalchemy|postgres|internal server error|database error|\bapi\b|http\s*[45]\d\d/i;
+const MENSAJE_SERVICIO =
+  "No pudimos completar la solicitud. Inténtalo de nuevo.";
+const MENSAJE_CONEXION =
+  "No fue posible establecer conexión. Comprueba tu conexión e inténtalo nuevamente.";
+const TECNICO =
+  /fastapi|backend|cors|traceback|exception|sqlalchemy|postgres|internal server error|database error|\bapi\b|http\s*[45]\d\d/i;
 
 function mensajeError(detalle: unknown, status?: number): string {
   if (status && status >= 500) return MENSAJE_SERVICIO;
@@ -38,12 +41,15 @@ function mensajeError(detalle: unknown, status?: number): string {
     if (textos.length) mensaje = textos.join(". ");
   }
   if (mensaje && !TECNICO.test(mensaje)) return mensaje;
-  if (status === 401) return "La sesión expiró o no es válida. Inicia sesión nuevamente.";
+  if (status === 401)
+    return "La sesión expiró o no es válida. Inicia sesión nuevamente.";
   if (status === 403) return "No tienes permisos para realizar esta acción.";
   if (status === 404) return "No se encontró la información solicitada.";
-  if (status === 409) return "La operación no se pudo completar debido al estado actual del registro.";
+  if (status === 409)
+    return "La operación no se pudo completar debido al estado actual del registro.";
   if (status === 413) return "El archivo supera el tamaño permitido.";
-  if (status === 422) return "Revisa la información ingresada e inténtalo nuevamente.";
+  if (status === 422)
+    return "Revisa la información ingresada e inténtalo nuevamente.";
   return MENSAJE_SERVICIO;
 }
 
@@ -59,7 +65,8 @@ const tokenDeSolicitud = new WeakMap<object, string>();
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   const ruta = config.url || "";
-  const rutaPublica = ruta.includes("/auth/login") || ruta.includes("/auth/register");
+  const rutaPublica =
+    ruta.includes("/auth/login") || ruta.includes("/auth/register");
   if (token && !rutaPublica && !config.headers.has("Authorization")) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
@@ -79,7 +86,11 @@ function solicitudDesactualizada(config: object | undefined): boolean {
 api.interceptors.response.use(
   (response) => {
     if (solicitudDesactualizada(response.config)) {
-      return Promise.reject(new ApiRequestError("La sesión cambió. Vuelve a cargar la información."));
+      return Promise.reject(
+        new ApiRequestError(
+          "La sesión cambió. Vuelve a cargar la información.",
+        ),
+      );
     }
     return response;
   },
@@ -87,12 +98,18 @@ api.interceptors.response.use(
     if (!axios.isAxiosError(error)) return Promise.reject(error);
     // Descartar también errores de sesiones anteriores; no revocar la sesión nueva.
     if (solicitudDesactualizada(error.config)) {
-      return Promise.reject(new ApiRequestError("La sesión cambió. Vuelve a cargar la información."));
+      return Promise.reject(
+        new ApiRequestError(
+          "La sesión cambió. Vuelve a cargar la información.",
+        ),
+      );
     }
     const status = error.response?.status;
     const url = error.config?.url || "";
     const isLogin = url.includes("/auth/login");
-    const usedAuthorization = String(error.config?.headers?.get?.("Authorization") || "");
+    const usedAuthorization = String(
+      error.config?.headers?.get?.("Authorization") || "",
+    );
     const currentToken = localStorage.getItem("token");
     if (
       status === 401 &&
@@ -105,13 +122,17 @@ api.interceptors.response.use(
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
     if (!error.response) {
-      const message = error.code === "ECONNABORTED"
-        ? "La solicitud tardó demasiado. Inténtalo nuevamente."
-        : MENSAJE_CONEXION;
+      const message =
+        error.code === "ECONNABORTED"
+          ? "La solicitud tardó demasiado. Inténtalo nuevamente."
+          : MENSAJE_CONEXION;
       return Promise.reject(new ApiRequestError(message));
     }
-    const detail = (error.response.data as { detail?: unknown } | undefined)?.detail;
-    return Promise.reject(new ApiRequestError(mensajeError(detail, status), status));
+    const detail = (error.response.data as { detail?: unknown } | undefined)
+      ?.detail;
+    return Promise.reject(
+      new ApiRequestError(mensajeError(detail, status), status),
+    );
   },
 );
 

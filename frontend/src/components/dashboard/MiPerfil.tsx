@@ -46,6 +46,7 @@ export default function MiPerfil() {
   const [imagen, setImagen] = useState<string | null>(null);
   const [tipo, setTipo] = useState("Sitio web");
   const [url, setUrl] = useState("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
@@ -65,7 +66,9 @@ export default function MiPerfil() {
       } catch (e) {
         if (e instanceof ApiRequestError && e.status === 404) {
           setSinPerfil(true);
-          setError("No se encontró tu perfil académico. Contacta al administrador para verificar tu registro.");
+          setError(
+            "No se encontró tu perfil académico. Contacta al administrador para verificar tu registro.",
+          );
           setPerfil(null);
           setForm(null);
           return;
@@ -80,10 +83,20 @@ export default function MiPerfil() {
         perfilService.enlaces(),
       ]);
       setAreas(catalogo.status === "fulfilled" ? catalogo.value : []);
-      setSeleccion(propias.status === "fulfilled" ? propias.value.map((a) => a.id_area) : []);
+      setSeleccion(
+        propias.status === "fulfilled"
+          ? propias.value.map((a) => a.id_area)
+          : [],
+      );
       setEnlaces(links.status === "fulfilled" ? links.value : []);
-      if ([catalogo, propias, links].some((resultado) => resultado.status === "rejected")) {
-        setError("Tu perfil se cargó, pero no se pudo consultar toda la información complementaria. Puedes reintentar más tarde.");
+      if (
+        [catalogo, propias, links].some(
+          (resultado) => resultado.status === "rejected",
+        )
+      ) {
+        setError(
+          "Tu perfil se cargó, pero no se pudo consultar toda la información complementaria. Puedes reintentar más tarde.",
+        );
       }
     } catch (e) {
       setError(mensajeError(e));
@@ -187,7 +200,8 @@ export default function MiPerfil() {
           {error}{" "}
           {sinPerfil && (
             <p className="mt-2 text-xs">
-              No se modificó la información de tu cuenta. Consulta al administrador si el problema continúa.
+              No se modificó la información de tu cuenta. Consulta al
+              administrador si el problema continúa.
             </p>
           )}{" "}
           {!perfil && !sinPerfil && (
@@ -426,13 +440,23 @@ export default function MiPerfil() {
               onSubmit={(e) => {
                 e.preventDefault();
                 void ejecutar(async () => {
-                  const enlace = await perfilService.agregarEnlace(
-                    tipo.trim(),
-                    url.trim(),
-                  );
-                  setEnlaces((prev) => [...prev, enlace]);
+                  if (editandoId !== null) {
+                    const actualizado = await perfilService.actualizarEnlace(
+                      editandoId, tipo.trim(), url.trim(),
+                    );
+                    setEnlaces((prev) => prev.map((e) =>
+                      e.id_enlace === editandoId ? actualizado : e,
+                    ));
+                    setEditandoId(null);
+                  } else {
+                    const enlace = await perfilService.agregarEnlace(
+                      tipo.trim(), url.trim(),
+                    );
+                    setEnlaces((prev) => [...prev, enlace]);
+                  }
                   setUrl("");
-                }, "Enlace agregado.");
+                  setTipo("Sitio web");
+                }, editandoId !== null ? "Enlace actualizado." : "Enlace agregado.");
               }}
             >
               <label className="min-w-36 flex-1 text-sm font-semibold">
@@ -457,9 +481,18 @@ export default function MiPerfil() {
                 />
               </label>
               <button className={boton} disabled={ocupado}>
-                <Link2 size={16} className="mr-1 inline" /> Agregar
+                <Link2 size={16} className="mr-1 inline" /> {editandoId !== null ? "Guardar cambios" : "Agregar"}
               </button>
             </form>
+            {editandoId !== null && (
+              <button
+                type="button"
+                className="mt-2 text-sm underline"
+                onClick={() => { setEditandoId(null); setTipo("Sitio web"); setUrl(""); }}
+              >
+                Cancelar edición
+              </button>
+            )}
             <ul className="mt-4 divide-y divide-[var(--cafe)]/20">
               {enlaces.map((enlace) => (
                 <li
@@ -478,6 +511,19 @@ export default function MiPerfil() {
                       <ExternalLink size={14} className="shrink-0" />
                     </a>
                   </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={ocupado}
+                    className="text-[var(--rojo-oscuro)] underline"
+                    onClick={() => {
+                      setEditandoId(enlace.id_enlace);
+                      setTipo(enlace.tipo);
+                      setUrl(enlace.url);
+                    }}
+                  >
+                    Editar
+                  </button>
                   <button
                     type="button"
                     disabled={ocupado}
@@ -496,6 +542,7 @@ export default function MiPerfil() {
                   >
                     <Trash2 size={16} /> Eliminar
                   </button>
+                  </div>
                 </li>
               ))}
             </ul>

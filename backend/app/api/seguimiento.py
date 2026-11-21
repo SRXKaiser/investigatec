@@ -122,6 +122,28 @@ def construir_seguimiento(
         )
     ).all()
 
+    # Precarga revisiones y decisiones en lotes para evitar una consulta
+    # adicional por cada versión y otra por cada decisión (problema N+1).
+    ids_archivos = [archivo.id_archivo for archivo in archivos]
+    todas_revisiones = db.scalars(
+        select(Revision)
+        .where(Revision.id_archivo.in_(ids_archivos))
+        .order_by(Revision.fecha_asignacion, Revision.id_revision)
+    ).all() if ids_archivos else []
+    revisiones_por_archivo = {}
+    for revision in todas_revisiones:
+        revisiones_por_archivo.setdefault(revision.id_archivo, []).append(revision)
+
+    ids_revision = [revision.id_revision for revision in todas_revisiones]
+    todas_decisiones = db.scalars(
+        select(Decision)
+        .where(Decision.id_revision.in_(ids_revision))
+        .order_by(Decision.id_decision)
+    ).all() if ids_revision else []
+    decisiones_por_revision = {
+        decision.id_revision: decision for decision in todas_decisiones
+    }
+
     documentos = {}
 
     for archivo in archivos:
@@ -137,30 +159,12 @@ def construir_seguimiento(
                 "versiones": [],
             }
 
-        revisiones = db.scalars(
-            select(Revision)
-            .where(
-                Revision.id_archivo == archivo.id_archivo
-            )
-            .order_by(
-                Revision.fecha_asignacion,
-                Revision.id_revision,
-            )
-        ).all()
+        revisiones = revisiones_por_archivo.get(archivo.id_archivo, [])
 
         historial_revisiones = []
 
         for revision in revisiones:
-            decision = db.scalar(
-                select(Decision)
-                .where(
-                    Decision.id_revision == revision.id_revision
-                )
-                .order_by(
-                    Decision.id_decision.desc()
-                )
-                .limit(1)
-            )
+            decision = decisiones_por_revision.get(revision.id_revision)
 
             historial_revisiones.append({
                 "id_revision": revision.id_revision,

@@ -7,6 +7,12 @@ class EnlaceCrear(BaseModel):
     orden: int = Field(default=0, ge=0)
 
 
+class EnlaceActualizar(BaseModel):
+    tipo: str | None = Field(default=None, min_length=1, max_length=50)
+    url: HttpUrl | None = None
+    orden: int | None = Field(default=None, ge=0)
+
+
 class EnlaceRespuesta(BaseModel):
     id_enlace: int
     id_perfil: int

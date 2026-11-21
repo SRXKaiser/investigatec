@@ -6,6 +6,7 @@ import {
   type DocumentoSeguimientoApi,
 } from "../../services/dashboardService";
 import { validarArchivo } from "../../services/fileValidation";
+import ConsultaDOI from "./ConsultaDOI";
 import type { ProyectoApi } from "../../types";
 
 interface DocumentoFila extends DocumentoSeguimientoApi {
@@ -222,6 +223,7 @@ const MisDocumentos = () => {
           + Subir documento
         </button>
       </div>
+      <ConsultaDOI />
       {!cargando && !proyectos.length && (
         <p className="text-sm text-amber-800">
           Primero crea un proyecto desde «Mis proyectos».

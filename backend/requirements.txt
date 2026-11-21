@@ -41,3 +41,5 @@ python-multipart
 pypdf
 python-docx
 Pillow>=11,<13
+# Consulta de metadatos académicos de Crossref
+httpx>=0.27,<1

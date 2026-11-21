@@ -133,3 +133,18 @@ def subir_nueva_version(
         )
     finally:
         archivo.file.close()
+
+
+@router.post(
+    "/{id_archivo}/reprocesar-resumen",
+    response_model=ArchivoRespuesta,
+)
+def reprocesar_resumen(
+    id_archivo: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obtener_usuario_actual),
+):
+    """Reprocesar un documento existente; propietario o administrador."""
+    return servicio.reprocesar_resumen_archivo(
+        db, id_archivo, usuario.id_usuario
+    )

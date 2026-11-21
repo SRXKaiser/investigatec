@@ -55,13 +55,17 @@ export default function Seguimiento() {
     // los proyectos visibles; limitar concurrencia evita saturar el servidor.
     const seguimientos: SeguimientoProyectoApi[] = [];
     if (user.tipo_usuario === "MIEMBRO") {
-      seguimientos.push(...await dashboardService.seguimientoMisProyectos());
+      seguimientos.push(...(await dashboardService.seguimientoMisProyectos()));
     } else {
       for (let index = 0; index < proyectosApi.length; index += 5) {
         const lote = proyectosApi.slice(index, index + 5);
-        seguimientos.push(...await Promise.all(
-          lote.map((project) => dashboardService.seguimientoProyecto(project.id_proyecto)),
-        ));
+        seguimientos.push(
+          ...(await Promise.all(
+            lote.map((project) =>
+              dashboardService.seguimientoProyecto(project.id_proyecto),
+            ),
+          )),
+        );
       }
     }
     let asesorPorInvestigador = new Map<number, Asesor>();

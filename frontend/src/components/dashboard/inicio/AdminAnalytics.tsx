@@ -21,6 +21,7 @@ const AdminAnalytics = () => {
   const [today, setToday] = useState(() => new Date());
   const [proyectos, setProyectos] = useState<ProyectoApi[]>([]);
   const [auditoria, setAuditoria] = useState<AuditoriaApi[]>([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const timer = window.setInterval(() => setToday(new Date()), 60000);
@@ -33,7 +34,9 @@ const AdminAnalytics = () => {
         setProyectos(p);
         setAuditoria(a);
       })
-      .catch(() => undefined);
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores.");
+      });
   }, []);
 
   const dates = getDates(today);
@@ -60,6 +63,11 @@ const AdminAnalytics = () => {
     });
   return (
     <section className="grid gap-5 xl:grid-cols-2">
+      {error && (
+        <p role="alert" className="xl:col-span-2 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          No se pudieron cargar los indicadores: {error}
+        </p>
+      )}
       <article className="rounded-2xl border-[var(--cafe)] bg-[var(--bg)] p-5 border-r-4 border-b-4 border-2">
         <div className="mb-3">
           <h2 className="font-bold text-[var(--rojo-oscuro)]">

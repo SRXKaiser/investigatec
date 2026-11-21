@@ -129,6 +129,10 @@ export const perfilService = {
     });
     return data;
   },
+  async actualizarEnlace(id: number, tipo: string, url: string): Promise<EnlaceApi> {
+    const { data } = await api.patch<EnlaceApi>(`/academico/enlaces/${id}`, { tipo, url });
+    return data;
+  },
   async eliminarEnlace(id: number): Promise<void> {
     await api.delete(`/academico/enlaces/${id}`);
   },

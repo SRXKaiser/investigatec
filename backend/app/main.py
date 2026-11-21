@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy import text
@@ -20,6 +20,7 @@ from app.api.revisiones import router as revisiones_router
 from app.api.notificaciones import router as notificaciones_router
 from app.api.asignaciones import router as asignaciones_router
 from app.api.seguimiento import router as seguimiento_router
+from app.api.publicaciones import router as publicaciones_router
 
 
 app = FastAPI(
@@ -40,6 +41,7 @@ app.include_router(revisiones_router)
 app.include_router(notificaciones_router)
 app.include_router(asignaciones_router)
 app.include_router(seguimiento_router)
+app.include_router(publicaciones_router)
 
 origins = [
     origin.strip()
@@ -76,7 +78,7 @@ def health():
         }
 
     except SQLAlchemyError:
-        return {
-            "api": "ok",
-            "database": "disconnected",
-        }
+        raise HTTPException(
+            status_code=503,
+            detail="Base de datos no disponible",
+        )

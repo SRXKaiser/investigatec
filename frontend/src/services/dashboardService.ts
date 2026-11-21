@@ -68,9 +68,7 @@ export const dashboardService = {
     const { data } = await api.get<ProyectoApi>(`/proyectos/${id}`);
     return data;
   },
-  async historialProyecto(
-    id: number,
-  ): Promise<
+  async historialProyecto(id: number): Promise<
     Array<{
       id_historial: number;
       estado_anterior: string | null;
@@ -142,6 +140,14 @@ export const dashboardService = {
       {
         timeout: 0, // 500 MB como máximo en el backend; evitar timeout de 20 s durante carga
       },
+    );
+    return data;
+  },
+  async reprocesarResumen(idArchivo: number) {
+    const { data } = await api.post<ArchivoApi>(
+      `/archivos/${idArchivo}/reprocesar-resumen`,
+      undefined,
+      { timeout: 120000 },
     );
     return data;
   },

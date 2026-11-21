@@ -52,7 +52,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState(0);
-  const [activeToken, setActiveToken] = useState<string | null>(() => localStorage.getItem("token"));
+  const [activeToken, setActiveToken] = useState<string | null>(() =>
+    localStorage.getItem("token"),
+  );
   const sessionVersion = useRef(0);
   const lastValidation = useRef(0);
 
@@ -79,8 +81,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     const version = ++sessionVersion.current;
     try {
-      const verified = await authService.validarSesion(token, readPreferredRole());
-      if (version === sessionVersion.current && localStorage.getItem("token") === token) {
+      const verified = await authService.validarSesion(
+        token,
+        readPreferredRole(),
+      );
+      if (
+        version === sessionVersion.current &&
+        localStorage.getItem("token") === token
+      ) {
         setUser(verified);
         setActiveToken(token);
         setSessionError(null);
@@ -88,14 +96,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastValidation.current = Date.now();
       }
     } catch (error) {
-      if (version !== sessionVersion.current || localStorage.getItem("token") !== token) return;
-      const status = error instanceof ApiRequestError ? error.status : undefined;
+      if (
+        version !== sessionVersion.current ||
+        localStorage.getItem("token") !== token
+      )
+        return;
+      const status =
+        error instanceof ApiRequestError ? error.status : undefined;
       if (status === 401 || status === 403) {
         endSession(true);
         return;
       }
       // Las caídas de red NO revocan la cuenta. En el arranque se ofrece reintentar.
-      setSessionError("No fue posible verificar tu sesión. Comprueba tu conexión y vuelve a intentarlo.");
+      setSessionError(
+        "No fue posible verificar tu sesión. Comprueba tu conexión y vuelve a intentarlo.",
+      );
     } finally {
       if (version === sessionVersion.current) setLoading(false);
     }
@@ -135,13 +150,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Revalidación tras volver a la pestaña y cada 5 minutos: detecta roles revocados.
   useEffect(() => {
     const validarAlVolver = () => {
-      if (document.visibilityState === "visible" && localStorage.getItem("token") &&
-          Date.now() - lastValidation.current > 60_000) {
+      if (
+        document.visibilityState === "visible" &&
+        localStorage.getItem("token") &&
+        Date.now() - lastValidation.current > 60_000
+      ) {
         void refreshUser();
       }
     };
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && localStorage.getItem("token")) {
+      if (
+        document.visibilityState === "visible" &&
+        localStorage.getItem("token")
+      ) {
         void refreshUser();
       }
     }, 5 * 60_000);
@@ -164,7 +185,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       logout();
       return;
     }
-    const timeout = window.setTimeout(logout, Math.min(remaining, 2_147_483_647));
+    const timeout = window.setTimeout(
+      logout,
+      Math.min(remaining, 2_147_483_647),
+    );
     return () => window.clearTimeout(timeout);
   }, [activeToken, logout]);
 
@@ -188,7 +212,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, refreshUser, selectRole, loading, sessionError, sessionId }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        refreshUser,
+        selectRole,
+        loading,
+        sessionError,
+        sessionId,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

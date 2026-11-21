@@ -6,7 +6,7 @@ from app.models.rol import Rol
 
 ROLES_INICIALES = {
     "MIEMBRO": "Integrante del Cuerpo Académico",
-    "REVISOR": "Revisa, aprueba o rechaza documentos asignados",
+    "REVISOR": "Revisa, aprueba o solicita correcciones en documentos asignados",
     "ADMIN": "Administra usuarios y permisos",
 }
 

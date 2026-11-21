@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -67,8 +68,15 @@ def registrar_usuario(
 
     db.add(nuevo_usuario)
 
-    # Guardar temporalmente para obtener su ID
-    db.flush()
+    # Obtener el ID y convertir una colisión concurrente de correo en 409.
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El correo electrónico ya está registrado",
+        ) from exc
 
     # Crear un username unico basado en el ID del usuario
     username = f"investigador{nuevo_usuario.id_usuario}"
@@ -103,7 +111,14 @@ def registrar_usuario(
 )
 
     # Guardar usuario y perfil en una misma transaccion
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El correo electrónico ya está registrado",
+        ) from exc
     db.refresh(nuevo_usuario)
 
     return nuevo_usuario

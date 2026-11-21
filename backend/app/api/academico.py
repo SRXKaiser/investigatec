@@ -13,6 +13,7 @@ from app.models.perfil import (
 )
 from app.schemas.academico import (
     EnlaceCrear,
+    EnlaceActualizar,
     EnlaceRespuesta,
     AreaRespuesta,
     AreasActualizar,
@@ -78,6 +79,39 @@ def listar_mis_enlaces(
         .where(EnlacePerfil.id_perfil == perfil.id_perfil)
         .order_by(EnlacePerfil.orden, EnlacePerfil.id_enlace)
     ).all()
+
+
+@router.patch("/enlaces/{id_enlace}", response_model=EnlaceRespuesta)
+def actualizar_enlace(
+    id_enlace: int,
+    datos: EnlaceActualizar,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Permite editar únicamente los enlaces del perfil propio."""
+    perfil = buscar_mi_perfil(db, usuario)
+    enlace = db.scalar(
+        select(EnlacePerfil).where(
+            EnlacePerfil.id_enlace == id_enlace,
+            EnlacePerfil.id_perfil == perfil.id_perfil,
+        )
+    )
+    if enlace is None:
+        raise HTTPException(404, "Enlace no encontrado")
+    cambios = datos.model_dump(exclude_unset=True)
+    for campo, valor in cambios.items():
+        if valor is None:
+            raise HTTPException(422, "No se permiten campos nulos")
+        if campo == "tipo":
+            valor = valor.strip()
+            if not valor:
+                raise HTTPException(422, "El tipo no puede estar vacío")
+        if campo == "url":
+            valor = str(valor)
+        setattr(enlace, campo, valor)
+    db.commit()
+    db.refresh(enlace)
+    return enlace
 
 
 @router.delete("/enlaces/{id_enlace}", status_code=204)

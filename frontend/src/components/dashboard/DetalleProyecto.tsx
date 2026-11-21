@@ -4,6 +4,7 @@ import { dashboardService } from "../../services/dashboardService";
 import type { SeguimientoProyectoApi } from "../../services/dashboardService";
 import type { ProyectoApi } from "../../types";
 import ResumenDocumento from "./ResumenDocumento";
+import { useAuth } from "../../context/AuthContext";
 
 type Cambio = {
   id_historial: number;
@@ -18,6 +19,7 @@ const panel =
   "rounded-2xl border-2 border-[var(--cafe)]/70 bg-[var(--bg)] p-4 sm:p-6";
 export default function DetalleProyecto() {
   const { idProyecto } = useParams();
+  const { user } = useAuth();
   const id = Number(idProyecto);
   const [proyecto, setProyecto] = useState<ProyectoApi | null>(null);
   const [seguimiento, setSeguimiento] = useState<SeguimientoProyectoApi | null>(
@@ -29,6 +31,7 @@ export default function DetalleProyecto() {
   const [cargando, setCargando] = useState(true);
   const [descargando, setDescargando] = useState<number | null>(null);
   const [descargaError, setDescargaError] = useState("");
+  const [reprocesando, setReprocesando] = useState<number | null>(null);
   useEffect(() => {
     let activo = true;
     setCargando(true);
@@ -89,6 +92,34 @@ export default function DetalleProyecto() {
       );
     } finally {
       setDescargando(null);
+    }
+  };
+  const reprocesar = async (idArchivo: number) => {
+    setDescargaError("");
+    setReprocesando(idArchivo);
+    try {
+      const resultado = await dashboardService.reprocesarResumen(idArchivo);
+      setSeguimiento((prev) =>
+        prev
+          ? {
+              ...prev,
+              documentos: prev.documentos.map((doc) => ({
+                ...doc,
+                versiones: doc.versiones.map((version) =>
+                  version.id_archivo === idArchivo
+                    ? { ...version, resumen_detectado: resultado.resumen_detectado }
+                    : version,
+                ),
+              })),
+            }
+          : prev,
+      );
+    } catch (e) {
+      setDescargaError(
+        e instanceof Error ? e.message : "No se pudo reprocesar el resumen.",
+      );
+    } finally {
+      setReprocesando(null);
     }
   };
   return (
@@ -204,7 +235,22 @@ export default function DetalleProyecto() {
                                   : "Descargar"}
                               </button>
                             </div>
-                            <ResumenDocumento resumen={version.resumen_detectado} />
+                            <ResumenDocumento
+                              resumen={version.resumen_detectado}
+                            />
+                            {(user?.id_usuario === proyecto.id_usuario ||
+                              user?.tipo_usuario === "ADMIN") && (
+                              <button
+                                type="button"
+                                disabled={reprocesando !== null}
+                                onClick={() => void reprocesar(version.id_archivo)}
+                                className="mt-2 rounded-lg border px-3 py-1.5 text-xs text-[var(--rojo)] disabled:opacity-50"
+                              >
+                                {reprocesando === version.id_archivo
+                                  ? "Analizando documento…"
+                                  : "Actualizar resumen"}
+                              </button>
+                            )}
                             {version.revisiones?.length ? (
                               <ul className="mt-3 space-y-2 border-t pt-3">
                                 {version.revisiones.map((rev) => (

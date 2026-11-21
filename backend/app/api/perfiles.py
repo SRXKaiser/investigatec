@@ -1,4 +1,5 @@
 
+import os
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -33,7 +34,7 @@ router = APIRouter(
     tags=["Perfiles academicos"],
 )
 
-STORAGE = Path("/code/storage/perfiles")
+STORAGE = Path(os.getenv("STORAGE_PATH", "/code/storage")) / "perfiles"
 MAX_FOTO_BYTES = 5 * 1024 * 1024
 MAX_PIXELES = 20_000_000
 

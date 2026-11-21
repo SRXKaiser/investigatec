@@ -23,11 +23,24 @@ const ProtectedRoute = ({ children, roles }: ProtectedRouteProps) => {
   }
   if (!user && sessionError) {
     return (
-      <section role="alert" className="mx-auto mt-12 max-w-xl rounded-2xl border bg-white p-8 text-center">
-        <h1 className="text-xl font-bold text-[var(--rojo-oscuro)]">No se pudo verificar tu sesión</h1>
+      <section
+        role="alert"
+        className="mx-auto mt-12 max-w-xl rounded-2xl border bg-white p-8 text-center"
+      >
+        <h1 className="text-xl font-bold text-[var(--rojo-oscuro)]">
+          No se pudo verificar tu sesión
+        </h1>
         <p className="mt-2 text-sm">{sessionError}</p>
-        <button type="button" className="mt-5 rounded-lg bg-[var(--rojo)] px-4 py-2 text-white" onClick={() => void refreshUser()}>Reintentar</button>
-        <Link to="/login" className="ml-3 inline-block underline">Ir al inicio</Link>
+        <button
+          type="button"
+          className="mt-5 rounded-lg bg-[var(--rojo)] px-4 py-2 text-white"
+          onClick={() => void refreshUser()}
+        >
+          Reintentar
+        </button>
+        <Link to="/login" className="ml-3 inline-block underline">
+          Ir al inicio
+        </Link>
       </section>
     );
   }

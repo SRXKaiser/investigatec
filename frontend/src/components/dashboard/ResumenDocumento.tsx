@@ -20,7 +20,7 @@ export default function ResumenDocumento({
           <p className="text-xs text-[var(--cafe)]/70">
             Resumen extraído automáticamente del documento original.
           </p>
-          <p className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed text-[var(--cafe)]">
+          <p className="whitespace-pre-wrap break-words leading-relaxed text-[var(--cafe)]">
             {contenido}
           </p>
         </div>
