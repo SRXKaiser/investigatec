@@ -1,5 +1,4 @@
 """Consulta de metadatos bibliográficos mediante la API pública de Crossref.
-
 No requiere credenciales y no permite elegir el servidor de destino.
 """
 
@@ -34,8 +33,8 @@ async def consultar_doi(doi: str = Query(min_length=7, max_length=200)):
     try:
         async with httpx.AsyncClient(timeout=8, follow_redirects=False) as cliente:
             respuesta = await cliente.get(
-                f"https://api.crossref.org/works/{quote(doi, safe='')}",
-                headers={"User-Agent": "InvestigaTec/2.0 (consulta académica)"},
+                f"https://api.crossref.org/works/{quote(doi, safe='/')}",
+                headers={"User-Agent": "InvestigaTec/2.0 (consulta academica)"},
             )
         if respuesta.status_code == 404:
             raise HTTPException(404, "DOI no encontrado en Crossref")
