@@ -12,7 +12,7 @@ interface PublicacionDOI {
   fuente: string;
 }
 
-/** Consulta opcional de publicaciones: API pública Crossref vía FastAPI. */
+/** Consulta opcional de publicaciones: API publica Crossref via FastAPI. */
 export default function ConsultaDOI() {
   const [doi, setDoi] = useState("");
   const [resultado, setResultado] = useState<PublicacionDOI | null>(null);
