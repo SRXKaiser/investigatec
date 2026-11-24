@@ -1,6 +1,6 @@
 # Inventario de cambios — InvestigaTec 2.0
 
-Comparación con `investigatec(1).zip`.
+Comparación con `investigatec 1.0`.
 
 ## Archivos modificados
 

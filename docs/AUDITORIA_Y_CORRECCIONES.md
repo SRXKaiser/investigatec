@@ -1,6 +1,6 @@
 # Auditoría y correcciones — InvestigaTec 2.0
 
-**Base:** ZIP `investigatec(1).zip` suministrado el 20/11/2026.
+**Base:** `investigatec 1.0`.
 **Alcance:** código fuente React/TypeScript, FastAPI/SQLAlchemy/Alembic, seguridad, documentos, revisiones, arranque Docker e indicadores, contrastados con la guía de Proyecto Final de Programación Web.
 
 ## 1. Cambios aplicados
@@ -19,7 +19,7 @@
 | Seguimiento | Consulta de revisiones y decisiones por cada versión (N+1). | Precarga por lote y agrupación en memoria de revisiones/decisiones por proyecto. |
 | Registro | Duplicado concurrente podía provocar error interno de unicidad. | Colisiones de correo convertidas en HTTP 409 al `flush` o `commit`. |
 | Roles | La descripción de REVISOR sugería rechazar documentos. | Actualizada conforme al flujo real: aprobar o solicitar correcciones. |
-| Calidad | No había suite de pruebas ni pipeline en este ZIP. | Pruebas pytest de API/resúmenes, `requirements-dev.txt` y GitHub Actions de backend/frontend. |
+| Calidad | No había suite de pruebas ni pipeline. | Pruebas pytest de API/resúmenes, `requirements-dev.txt` y GitHub Actions de backend/frontend. |
 | Gestión académica | README vacío, sin documentación de cambios. | README de despliegue, backlog de historias y plantilla `AI_USAGE.md`. |
 
 ## 2. Resultados verificados
@@ -32,12 +32,11 @@
 ## 3. Validaciones pendientes antes de declarar listo para producción
 
 - No hay Docker en el entorno de revisión. **No se ejecutó** `docker compose up -d --build` ni las migraciones contra la base de datos real. Probarlas en Windows con Docker Desktop.
-- No hay acceso a Internet desde este entorno y las dependencias del ZIP incluyen binarios Windows. **No se pudo ejecutar** Vite build completo ni `oxlint` nativo Linux; sí pasó `tsc -b`. En Docker y GitHub Actions `npm ci` debe instalar las dependencias del sistema operativo adecuado.
+- No hay acceso a Internet desde este entorno y las dependencias incluyen binarios Windows. **No se pudo ejecutar** Vite build completo ni `oxlint` nativo Linux; sí pasó `tsc -b`. En Docker y GitHub Actions `npm ci` debe instalar las dependencias del sistema operativo adecuado.
 - Crossref fue probado con una respuesta simulada, no con una consulta real a `api.crossref.org`. Validar con Internet.
 - No se ejecutó un navegador real, una auditoría Lighthouse ni una prueba con varios usuarios concurrentes.
 - No se verificó URL pública de producción; **no hay despliegue remoto realizado** en este paquete.
-- Los **Issues reales, PR revisados, rama `main` protegida y etiqueta `v1.0.0`** no se pueden crear ni acreditar solo con un ZIP. Usar `docs/HISTORIAS_USUARIO.md` como base para subir al tablero.
-- `AI_USAGE.md` es plantilla parcial: los integrantes deben completar los datos reales y la reflexión individual.
+- `AI_USAGE.md` es plantilla parcial: los integrantes deben completar los datos reales.
 - La seguridad de una plataforma en producción requiere, además, revisar dependencias, limitar el acceso a la BD, establecer backups, HTTPS y pruebas de penetración.
 
 ## 4. Comparación con el proyecto de Programación Web
@@ -63,12 +62,11 @@
 
 ## 5. Instalación y resguardo de datos
 
-1. Mantener la base de datos y la carpeta `storage/` originales. No están incluidas en el ZIP corregido (por privacidad).
+1. Mantener la base de datos y la carpeta `storage/` originales.
 2. Usar `.env.example` para completar `.env` sin subir secretos a GitHub.
 3. Revisar `README.md` y ejecutar `docker compose up -d --build`.
 4. Abrir `http://localhost:5173` y `http://localhost:8001/docs`.
 5. Antes de reprocesar los resúmenes antiguos, **hacer backup** y ejecutar `--dry-run`; solo después `--apply`.
-6. Si el ZIP original se compartió con credenciales reales, cambiarlas.
 
 ## 6. Límite de la auditoría
 
